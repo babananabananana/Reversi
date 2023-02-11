@@ -8,3 +8,4 @@ To run, enter directory where this code is located and type `python reversi_pyth
 
 ![Reversi Board Image](https://upload.wikimedia.org/wikipedia/commons/a/ae/Othello_%28Reversi%29_board.jpg)
 # Reversi
+# Reversi
