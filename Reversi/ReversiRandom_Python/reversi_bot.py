@@ -177,7 +177,6 @@ class GameNode:
             return
         for move in self.valid_moves:
             self.children.append(self.create_child(move))
-        self.children.sort(key=lambda x: x.value, reverse=True)
 
     def board_heatmap(self, state):
         val = state * self.square_vals
@@ -202,7 +201,7 @@ class GameNode:
 
         fin_val = hm
         fin_val += -2*tc
-        fin_val += mc
+        fin_val += mc * 2
         return fin_val
 
     def create_child(self, move):
