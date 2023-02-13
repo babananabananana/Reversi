@@ -264,10 +264,10 @@ class GameNode:
 
         count = 0
         for i in range(len(sequence)):
-            if sequence[i] == -1:
+            if sequence[i] == self.opponent_turn:
                 count = count + 1
             else:
-                if (sequence[i] == 1) and (count > 0):
+                if (sequence[i] == self.state.turn) and (count > 0):
                     return True
                 break
 

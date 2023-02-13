@@ -58,8 +58,8 @@ class ReversiBot:
             self.game_tree.curr = GameNode(reversi.ReversiGameState(state.board, self.our_turn))
 
         # Run algorithm through game tree to pick best child
-        self.game_tree.generate_3_generations()
-        # self.game_tree.generate_3_parallel()
+        # self.game_tree.generate_3_generations()
+        self.game_tree.generate_3_parallel()
 
 
         # Pick Best
@@ -76,8 +76,8 @@ class FindChildParallel:
 class FindGrandParallel:
     def __call__(self, node):
         node.create_children()
-        for great_grandchild in node.children:
-            great_grandchild.create_children()
+        # for great_grandchild in node.children:
+        #     great_grandchild.create_children()
             # for greatgreat in great_grandchild.children:
             #     greatgreat.create_children()
             #     for greatgreatgreat in greatgreat.children:
@@ -115,8 +115,8 @@ class GameTree:
             child.create_children()
             for grandchild in child.children:
                 grandchild.create_children()
-                for great_grandchild in grandchild.children:
-                    great_grandchild.create_children()
+                # for great_grandchild in grandchild.children:
+                #     great_grandchild.create_children()
 
     def generate_3_parallel(self):
         with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
@@ -159,9 +159,9 @@ class GameNode:
     def __init__(self, state, parent_move=None, value=0):
         self.state = state
         self.children = []
+        self.opponent_turn = -1 if self.state.turn == 1 else 1
         self.valid_moves = self.getValidMoves(state.turn)
         self.parent_move = parent_move
-        self.opponent_turn = -1 if self.state.turn == 1 else 1
         self.value = value
         self.square_vals = np.array(
             [[99, -8, 8, 6, 6, 8, -8, 99], [-8, -24, -4, -3, -3, -4, -24, -8], [8, -4, 7, 4, 4, 7, -4, 8],
@@ -191,14 +191,13 @@ class GameNode:
             s += sum(row)
         return s
 
-
     def eval_quality(self, child):
         state = child.state.board
         hm = self.board_heatmap(state)
         # tile count
         tc = self.tile_count(state)
         # move count
-        mc = len(child.getValidMoves())
+        mc = len(child.valid_moves)
 
         fin_val = hm
         fin_val += -2*tc
@@ -215,8 +214,8 @@ class GameNode:
         child = GameNode(reversi.ReversiGameState(state_copy, self.opponent_turn), move)
 
         value = self.eval_quality(child)
-
-        return GameNode(reversi.ReversiGameState(state_copy, self.opponent_turn), move, value)
+        child.value = value
+        return child
 
     def couldBe(self, row, col):
         for incx in range(-1, 2):
@@ -265,17 +264,14 @@ class GameNode:
 
         count = 0
         for i in range(len(sequence)):
-            if sequence[i] == -1:
+            if sequence[i] == self.opponent_turn:
                 count = count + 1
             else:
-                if (sequence[i] == 1) and (count > 0):
+                if (sequence[i] == self.state.turn) and (count > 0):
                     return True
                 break
 
-
         return False
-
-
 
     def getValidMoves(self, me = 1):
         validMoves = []
@@ -327,9 +323,6 @@ class AlphaBeta:
         for child in node.children:
             value = max(value, self.min_value(child, alpha, beta))
             if value >= beta:
-                # idx = node.children.index(child)
-                # print("cutting ", len(node.children), "to", idx, "from max")
-                # node.children = node.children[:idx+1]
                 return value
             alpha = max(alpha, value)
         return value
@@ -344,9 +337,6 @@ class AlphaBeta:
         for child in node.children:
             value = min(value, self.max_value(child, alpha, beta))
             if value <= alpha:
-                # idx = node.children.index(child)
-                # print("cutting ", len(node.children), "to", idx, "from min")
-                # node.children = node.children[:idx+1]
                 return value
             beta = min(beta, value)
 
