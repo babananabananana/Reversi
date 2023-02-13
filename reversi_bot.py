@@ -11,7 +11,8 @@ import copy
 # run a minmax
 # run a/b
 # modify heuristics
-# do we recompile the tree each time? or flesh out the tree a bit, then continue fleshing based on what the opp played  $
+# do we recompile the tree each time? or flesh out the tree a bit,      $
+# $then continue fleshing based on what the opp played                  $
 
 
 class ReversiBot:
@@ -19,7 +20,9 @@ class ReversiBot:
         self.our_turn = move_num
         self.opponent_turn = 2 if self.our_turn == 1 else 1
         self.init_state = np.array([[0 for i in range(8)] for j in range(8)])
-        self.game_tree = GameTree(GameNode(reversi.ReversiGameState(self.init_state, self.our_turn), None))
+        self.game_tree = GameTree(GameNode(reversi.ReversiGameState(self.init_state, self.our_turn)))
+        self.ab = AlphaBeta(self.game_tree)
+
 
     def make_move(self, state):
         '''
@@ -53,37 +56,33 @@ class ReversiBot:
         x = self.game_tree.find_grandchild_node(state.board)
 
         # Run algorithm through game tree to pick best child
-        self.game_tree.generate_grandchildren()
+        self.game_tree.generate_3_generations() # TODO: Duplicating game nodes
 
-        valid_moves = state.get_valid_moves()
-        print(len(valid_moves))
-        return valid_moves[0]
+        # Pick Best
+        child = self.ab.alpha_beta_search(self.game_tree.curr)
+
+        # valid_moves = state.get_valid_moves()
+        # print(len(valid_moves))
+        return child.parent_move
 
 class GameTree:
     def __init__(self, root):
         self.root = root
         self.curr = root
-        self.square_vals = np.array([[99,-8,8,6,6,8,-8,99],[-8,-24,-4,-3,-3,-4,-24,-8],[8,-4,7,4,4,7,-4,8],[6,-3,4,0,0,4,-3,6],
-                            [6,-3,4,0,0,4,-3,6],[8,-4,7,4,4,7,-4,8],[-8,-24,-4,-3,-3,-4,-24,-8],[99,-8,8,6,6,8,-8,99]])
         self.generate_grandchildren()
 
-
-    def board_heatmap(self, state):
-        val = state * self.square_vals
-        fin_val = sum(sum(col) for col in val)
-
-        return fin_val
-
-    def eval_qual(self, state):
-        val = self.board_heatmap(state)
-
-        fin_val = val
-        return fin_val
 
     def generate_grandchildren(self):
         self.curr.create_children()
         for child in self.curr.children:
             child.create_children()
+
+    def generate_3_generations(self):
+        self.curr.create_children()
+        for child in self.curr.children:
+            child.create_children()
+            for grandchild in child.children:
+                grandchild.create_children()
 
     def find_grandchild_node(self, board):
         # Find which GameTree's grandchild matches current game state
@@ -92,42 +91,56 @@ class GameTree:
                 if (grandchild.state.board == board).min():
                     self.curr = grandchild
                     return True
+        print('false')
         return False
 
 
 class GameNode:
-    def __init__(self, state, parent_move):
+    def __init__(self, state, parent_move=None, value=0):
         self.state = state
         self.children = []
         self.valid_moves = self.getValidMoves(state.turn)
         self.parent_move = parent_move
         self.opponent_turn = -1 if self.state.turn == 1 else 1
+        self.value = value
+        self.square_vals = np.array(
+            [[99, -8, 8, 6, 6, 8, -8, 99], [-8, -24, -4, -3, -3, -4, -24, -8], [8, -4, 7, 4, 4, 7, -4, 8],
+             [6, -3, 4, 0, 0, 4, -3, 6],
+             [6, -3, 4, 0, 0, 4, -3, 6], [8, -4, 7, 4, 4, 7, -4, 8], [-8, -24, -4, -3, -3, -4, -24, -8],
+             [99, -8, 8, 6, 6, 8, -8, 99]])
 
+        self.name = "root" if parent_move is None else str(parent_move)
 
 
     def create_children(self):
+        if len(self.children) != 0:
+            return
         for move in self.valid_moves:
-            child_board = self.create_child(move)
-            self.children.append(GameNode(reversi.ReversiGameState(child_board, self.opponent_turn), move))
+            self.children.append(self.create_child(move))
 
+    def board_heatmap(self, state):
+        val = state * self.square_vals
+        fin_val = sum(sum(col) for col in val)
+
+        return fin_val
+
+    def eval_quality(self, state):
+        val = self.board_heatmap(state)
+
+        fin_val = val
+        return fin_val
 
     def create_child(self, move):
         state_copy = copy.deepcopy(self.state.board)
         state_copy[move[0]][move[1]] = self.state.turn
-        tile_count = 0
-        opp_tile_count = 0
-
-        # for x in range(len(state_copy)):
-        #     for y in range(len(state_copy[0])):
-        #         if state_copy[x][y] == self.opponent:
-        #             state_copy[x][y] = -1
-        #             opp_tile_count += 1
-        #         if state_copy[x][y] == self.state.turn:
-        #             state_copy[x][y] = 1
-        #             tile_count += 1
+        # tile_count = 0
+        # opp_tile_count = 0
 
         self.changeColors(move[0], move[1], state_copy)
-        return state_copy
+
+        value = self.eval_quality(state_copy)
+
+        return GameNode(reversi.ReversiGameState(state_copy, self.opponent_turn), move, value)
 
     def couldBe(self, row, col):
         for incx in range(-1, 2):
@@ -161,7 +174,6 @@ class GameNode:
             r = row + incy * i
             c = col + incx * i
 
-
         return state
 
     def checkDirection(self, row, col, incx, incy):
@@ -194,6 +206,8 @@ class GameNode:
 
         return False
 
+
+
     def getValidMoves(self, me):
         validMoves = []
 
@@ -225,40 +239,40 @@ class AlphaBeta:
 
         successors = self.getSuccessors(node)
         best_state = None
-        for state in successors:
-            value = self.min_value(state, best_val, beta)
+        for child in successors:
+            value = self.min_value(child, best_val, beta)
             if value > best_val:
                 best_val = value
-                best_state = state
+                best_state = child
         print("AlphaBeta: Utility Value of Root Node: = " + str(best_val))
-        print("AlphaBeta: Best State is: " + best_state.Name)
+        print("AlphaBeta: Best State is: " + best_state.name)
         return best_state
 
     def max_value(self, node, alpha, beta):
-        print("AlphaBeta->MAX: Visited Node :: " + node.Name)
+        # print("AlphaBeta->MAX: Visited Node :: " + node.name)
         if self.isTerminal(node):
             return self.getUtility(node)
         infinity = float('inf')
         value = -infinity
 
         successors = self.getSuccessors(node)
-        for state in successors:
-            value = max(value, self.min_value(state, alpha, beta))
+        for child in successors:
+            value = max(value, self.min_value(child, alpha, beta))
             if value >= beta:
                 return value
             alpha = max(alpha, value)
         return value
 
     def min_value(self, node, alpha, beta):
-        print("AlphaBeta->MIN: Visited Node :: " + node.Name)
+        # print("AlphaBeta->MIN: Visited Node :: " + node.name)
         if self.isTerminal(node):
             return self.getUtility(node)
         infinity = float('inf')
         value = infinity
 
         successors = self.getSuccessors(node)
-        for state in successors:
-            value = min(value, self.max_value(state, alpha, beta))
+        for child in successors:
+            value = min(value, self.max_value(child, alpha, beta))
             if value <= alpha:
                 return value
             beta = min(beta, value)
@@ -278,4 +292,4 @@ class AlphaBeta:
 
     def getUtility(self, node):
         assert node is not None
-        return node.valu
+        return node.value
